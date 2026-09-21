@@ -15,11 +15,6 @@ from './fetch-ticket';
 
 import { getTask } from './fetch-task';
 
-
-// ============================================================
-// READLINE
-// ============================================================
-
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -40,11 +35,6 @@ function ask(question: string): Promise<string> {
 
 }
 
-
-// ============================================================
-// EMAIL LIST PARSER (comma-separated -> trimmed array)
-// ============================================================
-
 function parseEmailList(input: string): string[] {
 
   return input
@@ -53,9 +43,6 @@ function parseEmailList(input: string): string[] {
     .filter(e => e.length > 0);
 
 }
-// ============================================================
-// DISPLAY EMAIL DIRECTORY FROM data/*.csv
-// ============================================================
 
 function displayEmailDirectory(): void {
 
@@ -74,8 +61,6 @@ function displayEmailDirectory(): void {
     console.warn(`\n⚠️ No CSV file found in: ${dataDir}\n`);
     return;
   }
-
-  // If contacts.csv exists, use it. Otherwise use the first CSV file.
   const preferredFile =
     csvFiles.find(file => file.toLowerCase() === 'zohoContacts.csv') ||
     csvFiles[0];
@@ -126,21 +111,12 @@ function displayEmailDirectory(): void {
   }
 }
 
-
-// ============================================================
-// LOGIN ERROR MESSAGES
-// ============================================================
-
 const LOGIN_ERROR_SNIPPETS = [
   'login not created',
   'invalid credentials',
   'kindly contact hr',
 ];
 
-
-// ============================================================
-// CHECK CREDENTIALS
-// ============================================================
 
 async function checkCredentials(
   url: string,
@@ -197,12 +173,6 @@ async function checkCredentials(
   }
 
 }
-
-
-// ============================================================
-// FIND PLAYWRIGHT PROJECT ROOT
-// ============================================================
-
 function findProjectRoot(
   startPath: string
 ): string {
@@ -232,8 +202,6 @@ function findProjectRoot(
         'package.json'
       );
 
-
-    // Prefer Playwright config
     if (
       fs.existsSync(playwrightConfigTs) ||
       fs.existsSync(playwrightConfigJs)
@@ -243,8 +211,6 @@ function findProjectRoot(
 
     }
 
-
-    // package.json fallback
     if (
       fs.existsSync(packageJson)
     ) {
@@ -339,12 +305,6 @@ function runPlaywrightTest(
   );
 
   console.log('------------------------------------------\n');
-
-
-  // ----------------------------------------------------------
-  // Find Playwright executable
-  // ----------------------------------------------------------
-
   const playwrightCommand =
     process.platform === 'win32'
       ? path.join(
@@ -386,11 +346,6 @@ function runPlaywrightTest(
 
   }
 
-
-  // ----------------------------------------------------------
-  // Find Playwright CLI
-  // ----------------------------------------------------------
-
   const playwrightCli =
     path.join(
       projectRoot,
@@ -425,11 +380,6 @@ function runPlaywrightTest(
 
   }
 
-
-  // ----------------------------------------------------------
-  // Display metadata
-  // ----------------------------------------------------------
-
   console.log('\n==========================================');
   console.log('RUNNING EXISTING PLAYWRIGHT TEST');
   console.log('==========================================');
@@ -460,11 +410,6 @@ function runPlaywrightTest(
 
   console.log('==========================================\n');
 
-
-  // ----------------------------------------------------------
-  // Run existing test
-  // ----------------------------------------------------------
-
   const result =
     spawnSync(
       process.execPath,
@@ -481,13 +426,9 @@ function runPlaywrightTest(
 
         shell: false,
 
-        // Pass useful information to the existing
-        // Playwright test through environment variables.
         env: {
           ...process.env,
 
-          // Force report generation on every run through this script,
-          // regardless of what's set (or not set) in .env
           GENERATE_REPORT: 'true',
 
           TEST_URL: url,
@@ -511,11 +452,6 @@ function runPlaywrightTest(
       }
     );
 
-
-  // ----------------------------------------------------------
-  // Process-start error
-  // ----------------------------------------------------------
-
   if (
     result.error
   ) {
@@ -532,10 +468,6 @@ function runPlaywrightTest(
 
   }
 
-
-  // ----------------------------------------------------------
-  // Result
-  // ----------------------------------------------------------
 
   console.log(
     `\nPlaywright exit status: ${result.status}`
@@ -588,22 +520,11 @@ function runPlaywrightTest(
 
 }
 
-
-// ============================================================
-// MAIN
-// ============================================================
-
 async function main() {
 
   console.log('\n=================================');
   console.log('ZOHO DESK TEST AUTOMATION');
   console.log('=================================\n');
-
-
-  // ==========================================================
-  // GET TICKET / TASK ARGUMENT
-  // ==========================================================
-
   const ticketArg =
     process.argv.find(
       a => a.startsWith('--ticket=')
@@ -669,9 +590,6 @@ async function main() {
 
 
   displayEmailDirectory();
-  // ==========================================================
-  // EMAIL RECIPIENTS (asked upfront, right after ticket/task ID)
-  // ==========================================================
 
   const toInput =
     await ask(
@@ -690,9 +608,6 @@ async function main() {
     parseEmailList(ccInput);
   console.log(emailCcList);
 
-  // ==========================================================
-  // VARIABLES
-  // ==========================================================
 
   let subject = '';
 
@@ -701,10 +616,6 @@ async function main() {
   let requesterEmail = '';
   
   let ticketId = '';
-
-  // ==========================================================
-  // FETCH TICKET / TASK
-  // ==========================================================
 
   console.log('\nFetching...');
 
@@ -753,11 +664,6 @@ async function main() {
 
   }
 
-
-  // ==========================================================
-  // DISPLAY REQUIREMENTS
-  // ==========================================================
-
   console.log(
     '\n============== REQUIREMENTS =============='
   );
@@ -777,11 +683,6 @@ async function main() {
   console.log(
     '==========================================\n'
   );
-
-
-  // ==========================================================
-  // DETECT URL
-  // ==========================================================
 
   const urlMatch =
     description.match(
@@ -818,11 +719,6 @@ async function main() {
     process.exit(1);
 
   }
-
-
-  // ==========================================================
-  // CREDENTIAL LOOP
-  // ==========================================================
 
   let username = '';
 
@@ -880,21 +776,11 @@ async function main() {
 
   }
 
-
-  // ==========================================================
-  // REPORT TITLE
-  // ==========================================================
-
   const reportTitle =
     await ask(
       `Report title [Enter=${subject}]: `
     )
     || subject;
-
-
-  // ==========================================================
-  // EXISTING PLAYWRIGHT TEST FILE
-  // ==========================================================
 
   console.log('\n==========================================');
 
@@ -927,8 +813,6 @@ async function main() {
 
   }
 
-
-  // Remove surrounding quotes
   const testFilePath =
     path.resolve(
       inputPath
@@ -943,12 +827,6 @@ async function main() {
   console.log(
     `\nTest file: ${testFilePath}`
   );
-
-
-  // ==========================================================
-  // CHECK FILE EXISTS
-  // ==========================================================
-
   if (
     !fs.existsSync(testFilePath)
   ) {
@@ -966,11 +844,6 @@ async function main() {
     process.exit(1);
 
   }
-
-
-  // ==========================================================
-  // CHECK TEST FILE EXTENSION
-  // ==========================================================
 
   const extension =
     path
@@ -998,11 +871,6 @@ async function main() {
     process.exit(1);
 
   }
-
-
-  // ==========================================================
-  // RUN EXISTING TEST
-  // ==========================================================
 
   const { passed: testPassed, projectRoot } =
     runPlaywrightTest(
@@ -1049,11 +917,6 @@ async function main() {
       p => fs.existsSync(p)
     );
 
-
-  // ==========================================================
-  // CHECK REPORT FILES
-  // ==========================================================
-
   if (
     reportAttachments.length < 2
   ) {
@@ -1066,15 +929,6 @@ async function main() {
     );
 
   }
-
-
-  // ==========================================================
-  // SUMMARY
-  // ==========================================================
-  // Description format matches createTicket.ts: "Dear Team, We
-  // have tested the <module> Form please see the Attachments.
-  // Regards, <who>" — module is derived from the actual test
-  // file that was run, not the ticket subject.
 
   const testFileModule =
     path
@@ -1089,11 +943,6 @@ async function main() {
     `Please see the Attachments.\n\n` +
     `Regards,\n` +
     `${who}`;
-
-
-  // ==========================================================
-  // REPLY TO ZOHO TICKET
-  // ==========================================================
 
   if (
     sourceType === 'ticket'
@@ -1161,12 +1010,6 @@ async function main() {
     );
 
   }
-
-
-  // ==========================================================
-  // FINAL
-  // ==========================================================
-
   console.log(
     '\nCheck TestResults folder.'
   );
@@ -1175,11 +1018,6 @@ async function main() {
   rl.close();
 
 }
-
-
-// ============================================================
-// ERROR HANDLING
-// ============================================================
 
 main()
   .catch(err => {

@@ -1,12 +1,3 @@
-// fetch-task.ts
-//
-// Fetches a Zoho Desk TASK (Activities > Tasks module) by ID.
-// Unlike tickets, a task's description lives directly on the task object —
-// there's no separate conversations/threads lookup needed.
-//
-// Usage:
-//   npx ts-node fetch-task.ts --task=207801000006357001
-
 import 'dotenv/config';
 import fetch from 'node-fetch';
 
@@ -36,8 +27,6 @@ async function fetchTaskData(taskId: string, accessToken: string) {
     process.exit(1);
   }
 
-  // Zoho Desk task fields: id, subject, description, status, priority,
-  // dueDate, ticketId (if linked to a ticket), ownerId, departmentId, etc.
   return {
     id: taskData.id,
     subject: taskData.subject || '',

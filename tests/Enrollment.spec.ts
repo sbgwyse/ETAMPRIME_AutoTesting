@@ -1,73 +1,190 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import path from 'path';
+import fs from 'fs';
 
-test('Registration - Enrollment', async ({ page }) => {
-  // Login (single-step, current password)
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
-  await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
+/**
+ * ETAM Prime — Enrollment / Face Enrollment / Download Setup
+ *
+ * Credentials are read from environment variables instead of being
+ * hardcoded, so this file is safe to commit. Set them before running:
+ *
+ *   Windows (PowerShell):
+ *     $env:ETAM_USERNAME="ADMIN/etam100"
+ *     $env:ETAM_PASSWORD="your-password"
+ *     npx playwright test enrollment.spec.ts
+ *
+ *   Or add a .env file + dotenv, or a playwright.config.ts "use" block.
+ */
+
+const BASE_URL = 'https://presence.tajhotels.com/etam_prime';
+const USERNAME = process.env.ETAM_USERNAME ?? '';
+const PASSWORD = process.env.ETAM_PASSWORD ?? '';
+const ENROLL_USER = process.env.ETAM_ENROLL_USER ?? 'Shiv Kumar';
+
+const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
+
+// Centralized timeouts (ms) — tune these in one place instead of hunting
+// through every test if the app turns out slower/faster than expected.
+const TEST_TIMEOUT = 90_000;        // overall budget per test
+const LOGIN_TIMEOUT = 15_000;       // waiting for the ENROLLMENT page after sign-in
+const DOWNLOAD_TIMEOUT = 30_000;    // waiting for a download to start after a click
+
+test.beforeAll(() => {
+  if (!USERNAME || !PASSWORD) {
+    throw new Error(
+      'ETAM_USERNAME / ETAM_PASSWORD env vars are not set. See file header for how to set them.'
+    );
+  }
+  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+});
+
+/** Logs in and lands on the Registration page, ready for enrollment work. */
+async function login(page: Page) {
+  await page.goto(`${BASE_URL}/login`);
+  await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
+  await page.getByRole('textbox', { name: 'Password' }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await page.waitForURL('**/client**');
 
-  const loader = page.locator('.ngx-overlay, .ngx-ui-loader');
+  // Confirm login actually succeeded before moving on.
+  await expect(page.getByText('ENROLLMENT')).toBeVisible({ timeout: LOGIN_TIMEOUT });
+}
 
-  // Navigate to Registration > Enrollment
-  await page.getByText('REGISTRATION').click();
+/** Opens Enrollment and selects the given employee via the autocomplete. */
+async function openEnrollmentForUser(page: Page, name: string) {
   await page.getByText('ENROLLMENT').click();
-  await loader.waitFor({ state: 'hidden' }).catch(() => {});
+  await page.locator('p-autocomplete').getByRole('button').click();
+  await page.getByText(`- ${name}`).click();
+}
 
-  // Look up employee and select from dropdown
-  const employeeLookup = page.locator('input[name="fakeusernameremembered"]');
-  await employeeLookup.fill('500100123');
-  await page.getByText('- Priya Shaha').click();
-  await loader.waitFor({ state: 'hidden' }).catch(() => {});
+/** Waits for a click-triggered download and saves it under DOWNLOAD_DIR. */
+async function expectDownload(
+  page: Page,
+  trigger: () => Promise<void>,
+  label: string
+) {
+  const downloadPromise = page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT });
+  await trigger();
+  const download = await downloadPromise;
 
-  // --- Fingerprint Enrollment tab ---
-  const fpEnrolledDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Enrolled User' }).click();
-  await (await fpEnrolledDownload).saveAs(path.join('downloads', 'fp-enrolled-user.csv'));
+  expect(download.suggestedFilename(), `${label} filename`).toBeTruthy();
 
-  const fpToEnrollDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'User To Be Enroll' }).click();
-  await (await fpToEnrollDownload).saveAs(path.join('downloads', 'fp-user-to-be-enrolled.csv'));
+  const savePath = path.join(DOWNLOAD_DIR, download.suggestedFilename());
+  await download.saveAs(savePath);
+  expect(fs.existsSync(savePath), `${label} saved to disk`).toBeTruthy();
 
-  await page.getByText('To Enroll Fingerprint To').click();
+  return download;
+}
 
-  // --- Face Enrollment tab ---
-  await page.getByRole('tab', { name: 'Face Enrollment' }).click();
-  await loader.waitFor({ state: 'hidden' }).catch(() => {});
+test.describe('ETAM Prime — Enrollment', () => {
+  test.describe.configure({ timeout: TEST_TIMEOUT });
 
-  const faceEnrolledDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Enrolled User' }).click();
-  await (await faceEnrolledDownload).saveAs(path.join('downloads', 'face-enrolled-user.csv'));
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    await openEnrollmentForUser(page, ENROLL_USER);
+  });
 
-  const faceToEnrollDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'User To Be Enroll' }).click();
-  await (await faceToEnrollDownload).saveAs(path.join('downloads', 'face-user-to-be-enrolled.csv'));
+  test('Fingerprint enrollment: user lists download correctly', async ({ page }) => {
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'Enrolled User' }).click(),
+      'Enrolled User (fingerprint) list'
+    );
 
-  await page.getByRole('button', { name: 'Show Image' }).click();
-  await page.getByRole('button', { name: 'Show All Image Data' }).click();
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'User To Be Enroll' }).click(),
+      'User To Be Enroll (fingerprint) list'
+    );
 
-  // --- Download Setup tab ---
-  await page.getByRole('tab', { name: 'Download Setup' }).click();
-  await loader.waitFor({ state: 'hidden' }).catch(() => {});
+    // Navigating into the "To Enroll Fingerprint" detail view.
+    const detailLink = page.getByText('To Enroll Fingerprint To');
+    await expect(detailLink).toBeVisible();
+    await detailLink.click();
+  });
 
-  const driversDownload = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Device Drivers ' }).click();
-  await (await driversDownload).saveAs(path.join('downloads', 'device-drivers.zip'));
+  test('Face enrollment: user lists, image viewer, and PDF/Excel exports', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Face Enrollment' }).click();
 
-  const enrollServiceDownload = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Enrollment Service ' }).click();
-  await (await enrollServiceDownload).saveAs(path.join('downloads', 'enrollment-service.zip'));
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'Enrolled User' }).click(),
+      'Enrolled User (face) list'
+    );
 
-  await page.getByRole('link', { name: 'Enrollment Setup ', exact: true }).click();
-  await page.getByRole('link', { name: 'Web Enroll Document ' }).click();
-  await page.getByRole('link', { name: 'Face Enrollment Setup ' }).click();
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'User To Be Enroll' }).click(),
+      'User To Be Enroll (face) list'
+    );
 
-  const enroll32Popup = page.waitForEvent('popup');
-  const enroll32Download = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Enroll32 Setup ' }).click();
-  const popup = await enroll32Popup;
-  await (await enroll32Download).saveAs(path.join('downloads', 'enroll32-setup.exe'));
-  await popup.close();
+    await page.getByRole('button', { name: 'Show Image' }).click();
+    await page.getByRole('button', { name: 'Show All Image Data' }).click();
+
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'Download PDF' }).click(),
+      'Face enrollment PDF export'
+    );
+
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'Download Excel' }).click(),
+      'Face enrollment Excel export (1st)'
+    );
+
+    // NOTE: original recording clicked "Download Excel" a second time here.
+    // Confirm with the app owner whether this is a second, distinct export
+    // (e.g. a different report/tab) or an accidental duplicate click before
+    // keeping both assertions.
+    await expectDownload(
+      page,
+      () => page.getByRole('button', { name: 'Download Excel' }).click(),
+      'Face enrollment Excel export (2nd)'
+    );
+
+    // Close the image data view.
+    await page.getByRole('button', { name: 'Show All Image Data' }).click();
+  });
+
+  test('Download Setup: drivers, services, and setup files are downloadable', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Download Setup' }).click();
+
+    await expectDownload(
+      page,
+      () => page.getByRole('link', { name: 'Device Drivers ' }).click(),
+      'Device Drivers'
+    );
+
+    await expectDownload(
+      page,
+      () => page.getByRole('link', { name: 'Enrollment Service ' }).click(),
+      'Enrollment Service'
+    );
+
+    // This link was clicked in the recording but no download/navigation was
+    // captured — verify manually whether it should trigger something.
+    // NOTE: its accessible name is "Enrollment Setup " + an icon glyph, not
+    // a plain trailing space, and "Face Enrollment Setup" also contains
+    // "Enrollment Setup" as a substring — so match must anchor to the start.
+    await page.getByRole('link', { name: /^Enrollment Setup/ }).click();
+
+    await expectDownload(
+      page,
+      () => page.getByRole('link', { name: 'Web Enroll Document ' }).click(),
+      'Web Enroll Document'
+    );
+
+    // "Face Enrollment Setup" and "Enroll32 Setup" trigger downloads only —
+    // no popup. (The earlier "Web Enroll Document" PDF click is what opens a
+    // new tab, in Chrome's built-in PDF viewer; confirmed via trace network
+    // logs, which showed WebEnrollDocument.pdf loading in a second page ID
+    // right after that click, well before this step runs.)
+    await page.getByRole('link', { name: 'Face Enrollment Setup ' }).click();
+
+    await expectDownload(
+      page,
+      () => page.getByRole('link', { name: 'Enroll32 Setup ' }).click(),
+      'Enroll32 Setup'
+    );
+  });
 });

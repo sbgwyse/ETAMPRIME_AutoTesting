@@ -1,19 +1,3 @@
-// email-helper.ts
-//
-// Sends the test-result email (with PDF/Excel attachments) via SMTP,
-// using nodemailer. Requires these vars in .env:
-//
-//   SMTP_HOST=smtp.office365.com        (or your provider's SMTP host)
-//   SMTP_PORT=587
-//   SMTP_SECURE=false                   (true only if using port 465)
-//   SMTP_USER=sbg@wyse.co.in
-//   SMTP_PASS=your-smtp-password-or-app-password
-//   SMTP_FROM=sbg@wyse.co.in            (optional, defaults to SMTP_USER)
-//
-// Install the package first (not yet in package.json):
-//   npm install nodemailer
-//   npm install --save-dev @types/nodemailer
-
 import 'dotenv/config';
 import nodemailer from 'nodemailer';
 

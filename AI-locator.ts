@@ -1,23 +1,3 @@
-// ai-locator.ts
-//
-// Instead of hardcoding a Playwright locator for every step, this resolves
-// a plain-English instruction (e.g. "click the Save button") into a real
-// locator at RUNTIME, by asking Claude to match it against the interactive
-// elements currently visible on the page.
-//
-// Requires ANTHROPIC_API_KEY in .env.
-//
-// Trade-offs to be aware of:
-//   - One API call per step -> slower and has a real (small) cost per run.
-//   - Non-deterministic: the AI could occasionally pick the wrong element.
-//     Every resolution is logged so you can audit what it picked and why.
-//   - Sensitive values (passwords, etc.) are NEVER sent to the AI — only
-//     the plain-English instruction and the page's role/name list. Use the
-//     `valueOverride` param to inject real values locally after resolution.
-
-// Uses Node's built-in global fetch (Node 18+) rather than the node-fetch
-// package — node-fetch v2 has a known "Premature close" bug during gzip
-// decompression on newer Node versions, and native fetch avoids it entirely.
 import type { Page } from '@playwright/test';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -42,18 +22,6 @@ interface ResolvedAction {
   error?: string;
 }
 
-// ===========================
-// Collect visible interactive elements via ariaSnapshot() — the modern
-// replacement for the old (now-removed) page.accessibility.snapshot() API.
-// ariaSnapshot() returns a YAML-like text tree, e.g.:
-//   - textbox "Username"
-//   - button "Sign In"
-//   - combobox "Year"
-// We regex out role/name pairs rather than fully parsing the YAML, since
-// we only need the flat list, not the hierarchy.
-// (role + accessible name only — never the typed-in value, to avoid ever
-// leaking sensitive field contents to the AI)
-// ===========================
 async function collectInteractiveElements(page: Page): Promise<PageElement[]> {
   const snapshotText: string = await page.locator('body').ariaSnapshot();
 
@@ -75,10 +43,6 @@ async function collectInteractiveElements(page: Page): Promise<PageElement[]> {
     return true;
   });
 }
-
-// ===========================
-// Ask Claude to match the instruction to one of the elements
-// ===========================
 async function askClaudeToResolve(instruction: string, elements: PageElement[]): Promise<ResolvedAction> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not set in .env');

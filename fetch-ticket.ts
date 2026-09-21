@@ -8,10 +8,6 @@ import {
 } from './zoho-helper';
 
 let InternalTicketId = "";
-// ============================================================
-// Upload file to Zoho Desk
-// ============================================================
-
 export async function uploadFile(file: string): Promise<string> {
 
   if (!fs.existsSync(file)) {

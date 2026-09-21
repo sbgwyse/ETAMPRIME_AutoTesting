@@ -9,32 +9,49 @@ import {
 } 
 from './fetch-ticket';
 
-export async function getAgentIdByEmail(email: string): Promise<string> {
-  const response = await fetch(
-    `https://desk.zoho.in/api/v1/agents?searchStr=${encodeURIComponent(email)}`,
-    {
-      headers: {
-        Authorization: `Zoho-oauthtoken ${process.env.ZOHO_ACCESS_TOKEN}`,
-        'X-com-zoho-desk-organizationid': process.env.ZOHO_ORG_ID!,
+export async function getAgentIdByEmail(emails: string): Promise<string> {
+  // emails may be a single address or a comma-separated list (e.g. "dev7@wyse.co.in,nsp@wyse.co.in").
+  // Zoho's agent search only matches one literal searchStr at a time, so query each candidate in turn.
+  const emailList = emails.split(',').map((e) => e.trim()).filter(Boolean);
+  const accessToken = await getAccessToken();
+
+  for (const email of emailList) {
+    const response = await fetch(
+      `https://desk.zoho.in/api/v1/agents?searchStr=${encodeURIComponent(email)}`,
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          'X-com-zoho-desk-organizationid': process.env.ZOHO_ORG_ID!,
+        },
       },
-    },
-  );
- 
-  const data = await response.json();
- 
-  if (!response.ok) {
-    throw new Error(`Zoho Desk Agent Lookup Error: ${JSON.stringify(data)}`);
+    );
+
+    // 204 = no agents matched this searchStr; try the next candidate email.
+    if (response.status === 204) {
+      continue;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      continue;
+    }
+
+    const data = JSON.parse(text);
+
+    if (!response.ok) {
+      throw new Error(`Zoho Desk Agent Lookup Error: ${JSON.stringify(data)}`);
+    }
+
+    const agent = (data.data || []).find(
+      (a: any) => a.emailId?.toLowerCase() === email.toLowerCase(),
+    );
+
+    if (agent) {
+      return agent.id;
+    }
   }
- 
-  const agent = (data.data || []).find(
-    (a: any) => a.emailId?.toLowerCase() === email.toLowerCase(),
-  );
- 
-  if (!agent) {
-    throw new Error(`No Zoho agent found with email: ${email}`);
-  }
- 
-  return agent.id;
+
+  throw new Error(`No Zoho agent found with email(s): ${emails}`);
 }
  
 export async function createTicket(

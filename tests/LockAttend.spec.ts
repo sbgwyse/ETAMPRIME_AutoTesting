@@ -1,19 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
- 
-const BASE_URL = 'https://presence.tajhotels.com/etam_prime/login';
-const USERNAME = process.env.ETAM_USERNAME || 'ADMIN/etam100';
+
+const BASE_URL = 'https://uatpresence.tajhotels.com/etam_prime/login';
+const USERNAME = process.env.ETAM_USERNAME || 'ADMIN/etam480';
 const PASSWORD = process.env.ETAM_PASSWORD || '$WysE123';
- 
-/**
- * Waits for the app's global loading spinner to clear. This app shows
- * ".ngx-overlay" after many actions (filter changes, saves, etc.) while
- * it fetches data, and that overlay intercepts clicks aimed at elements
- * underneath it if you click too soon.
- */
+
 async function waitForOverlayGone(page: Page, timeout = 15000) {
   await page.locator('.ngx-overlay').waitFor({ state: 'hidden', timeout }).catch(() => {});
 }
- 
+
 async function login(page: Page) {
   await page.goto(BASE_URL);
   await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
@@ -22,118 +16,131 @@ async function login(page: Page) {
   await page.getByRole('button', { name: 'Sign In' }).click();
   await waitForOverlayGone(page);
 }
- 
+
 async function setDateRange(page: Page) {
-     await page.getByRole('textbox', { name: 'Select Date Range' }).click();
-    await expect(page.getByText('LAST MONTH')).toBeVisible();
-    await page.getByText('LAST MONTH').click();
+  await page.getByRole('textbox', { name: 'Select Date Range' }).click();
+  await expect(page.getByText('LAST MONTH')).toBeVisible();
+  await page.getByText('LAST MONTH').click();
   await waitForOverlayGone(page);
 }
- 
-/**
- * Opens the department multiselect and picks entries via the virtual
- * scroll viewport, matching the exact recorded flow.
- */
-// async function selectDepartments(page: Page) {
- 
-//    await page.locator('.p-multiselect-trigger-icon').first().click();
-
-//   await waitForOverlayGone(page);
-
-//   await page.waitForTimeout(2000); 
-//   await page.getByRole('checkbox').nth(2).click();
-//   await page.locator('cdk-virtual-scroll-viewport').click();
-//   await waitForOverlayGone(page);
-//   await page.getByRole('checkbox').nth(2).click();
-//   await waitForOverlayGone(page);
-// }
- 
 
 async function selectDepartments(page: Page) {
-  const departmentTrigger = page.locator('.p-multiselect-trigger-icon').first();
+  const department = page.locator('p-multiselect[name="deptname"]');
 
-  await departmentTrigger.click();
+  await department.locator('.p-multiselect-trigger').click();
 
-  // Wait for the department dropdown/checkboxes to appear
-  const checkbox = page.getByRole('checkbox').nth(2);
-  await checkbox.waitFor({
-    state: 'visible',
-    timeout: 15000,
-  });
+  const panel = department.locator('.p-multiselect-panel');
+  await expect(panel).toBeVisible();
 
-  // Give the UI a moment to finish rendering/animation
-  await page.waitForTimeout(500);
+  const departments = panel.locator('li.p-multiselect-item');
 
-  await checkbox.click();
+  const count = await departments.count();
+  console.log(`Departments found: ${count}`);
 
-  // Preserve your recorded flow
-  await page.locator('cdk-virtual-scroll-viewport').click();
+  for (let i = 0; i < count; i++) {
+    await departments.nth(i).click();
+  }
 
-  await waitForOverlayGone(page);
+  const selectedDepartments = department.locator(
+    '.p-multiselect-label .p-multiselect-token'
+  );
 
-  await checkbox.waitFor({
-    state: 'visible',
-    timeout: 15000,
-  });
+  await expect(selectedDepartments).toHaveCount(count);
 
-  await page.waitForTimeout(500);
-
-  await checkbox.click();
+  await department.locator('.p-multiselect-trigger').click();
 
   await waitForOverlayGone(page);
 }
 
+async function selectEmployees(page: Page) {
+  const employeeTable = page.locator('p-table[selectionmode="multiple"]');
+  const table = employeeTable.locator('table.p-datatable-table');
+  const rows = table.locator('tbody tr.p-selectable-row');
 
-async function clickLockAttendanceData(page: Page) {
+  await expect(rows.first()).toBeVisible({ timeout: 30000 });
   await waitForOverlayGone(page);
-  await page.getByRole('button', { name: 'Lock Attendance Data' }).click();
+
+  // wait until the row count stops changing (grid can re-render after filters)
+  let prev = -1;
+  let employeeCount = await rows.count();
+  for (let i = 0; i < 10 && employeeCount !== prev; i++) {
+    prev = employeeCount;
+    await page.waitForTimeout(700);
+    employeeCount = await rows.count();
+  }
+  console.log(`Employees loaded: ${employeeCount}`);
+  expect(employeeCount).toBeGreaterThan(0);
+
+  const selectAll = table.locator('thead [role="checkbox"]');
+  await expect(selectAll).toBeVisible({ timeout: 10000 });
+  await selectAll.click();
+  await expect(selectAll).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+
+  // real class filter: the highlight class goes in the selector itself
+  const selectedRows = table.locator('tbody tr.p-selectable-row.p-highlight');
+  await expect(selectedRows).toHaveCount(employeeCount, { timeout: 10000 });
+
+  const selectedEmployees = page.getByRole('button', { name: /Selected Employees/ });
+  await expect(selectedEmployees).toContainText(
+    `Selected Employees : ${employeeCount}`,
+    { timeout: 10000 }
+  );
+
+  console.log(`Selected Employees : ${employeeCount}`);
+}
+
+async function applyFilters(page: Page) {
+  await setDateRange(page);
+  await selectDepartments(page);
+  await selectEmployees(page);
+}
+
+async function clickActionButton(page: Page, name: string) {
+  await waitForOverlayGone(page);
+  await page.getByRole('button', { name }).click();
   await waitForOverlayGone(page);
 }
- 
+
 async function acknowledgeResultDialog(page: Page) {
   const okButton = page.getByRole('button', { name: 'OK' });
   await okButton.waitFor({ state: 'visible', timeout: 20000 });
   await okButton.click();
   await waitForOverlayGone(page);
 }
- 
-test('Lock Attendance - lock and download report', async ({ page }) => {
-  test.setTimeout(240_000);
- 
-  await login(page);
- 
-  await page.getByText('MONTHLY PAY PROCESS').click();
-  await page.getByRole('combobox').selectOption('Lock Attendance');
-  await waitForOverlayGone(page);
- 
-  // Phase 1: filters, lock attendance, acknowledge result
-  await setDateRange(page);
-  await selectDepartments(page);
-  await clickLockAttendanceData(page);
-  await acknowledgeResultDialog(page);
- 
-  // First "Report" click right after OK — per the recorded flow this
-  // primes the report screen; the real download only fires after
-  // re-applying filters below.
- 
- 
-  // Phase 2: re-apply filters, then the second "Report" click downloads
-  await setDateRange(page);
-  await selectDepartments(page);
-  // The recorded flow clicks the virtual-scroll viewport a second time
-  // here before the final checkbox selection — preserved as recorded.
-//   await page.getByRole('checkbox').nth(2).click();
-//   await waitForOverlayGone(page);
 
-//   await page.locator('cdk-virtual-scroll-viewport').click();
-//   await waitForOverlayGone(page);
-  
- 
+async function downloadReport(page: Page) {
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Report' }).click();
   const download = await downloadPromise;
- 
+
   await download.saveAs(`downloads/${download.suggestedFilename()}`);
   expect(download.suggestedFilename()).toBeTruthy();
+}
+
+test('Compare Attendance then Lock Attendance - lock and download report', async ({ page }) => {
+  test.setTimeout(300_000);
+
+  await login(page);
+
+  await page.getByText('MONTHLY PAY PROCESS').click();
+
+  // ---------- Compare Attendance ----------
+  await page.getByRole('combobox').selectOption('Compare Attendance');
+  await waitForOverlayGone(page);
+
+  await applyFilters(page);
+  await clickActionButton(page, 'Compare Attendance Data');
+  await acknowledgeResultDialog(page);
+
+  // ---------- Lock Attendance ----------
+  await page.getByRole('combobox').selectOption('Lock Attendance');
+  await waitForOverlayGone(page);
+
+  await applyFilters(page);
+  await clickActionButton(page, 'Lock Attendance Data');
+  await acknowledgeResultDialog(page);
+
+  // ---------- Re-apply filters and download report ----------
+  await applyFilters(page);
+  await downloadReport(page);
 });
- 

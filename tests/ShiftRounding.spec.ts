@@ -2,35 +2,28 @@ import { test, expect, Page } from '@playwright/test';
 
 /**
  * ETAM PRIME - Shift Rounding flow (Registration module)
- * Refactored from raw codegen recording.
  *
- * Notes on cleanup vs. the original recording:
- * - Removed redundant/no-op `press('CapsLock')` calls and duplicate `fill()`
- *   calls on the Username field (codegen artifacts from typing, not real steps).
- * - Credentials pulled from env vars instead of being hardcoded.
- * - The site appears to have a two-step sign-in: an initial Sign In, followed
- *   by an icon click (`i`) that reveals a second Password field which must be
- *   re-entered and submitted. Kept as-is since it's a real app behavior, but
- *   isolated into `login()` so it's not duplicated across specs.
- * - Weekday checkboxes selected via `#DayName > .p-checkbox > .p-checkbox-box`
- *   — kept the ID-scoped locator since it's more robust than a bare class
- *   selector if other checkboxes share the same PrimeNG classes elsewhere
- *   on the page.
+ * Login always uses ADMIN/etam480. The shared ETAM_USERNAME / ETAM_PASSWORD
+ * env vars are intentionally NOT read here, so they can't override this account.
+ * To use a different account for this spec only, set ETAM480_USERNAME /
+ * ETAM480_PASSWORD / ETAM480_SECOND_PASSWORD.
  */
 
 const PAUSE_MS = 300;
 
-const USERNAME = process.env.ETAM_USERNAME ?? 'ADMIN/etam100';
-const PASSWORD = process.env.ETAM_PASSWORD ?? '$WsE123';
+const USERNAME = process.env.ETAM480_USERNAME || 'ADMIN/etam480';
+const PASSWORD = process.env.ETAM480_PASSWORD || '$WsE123';
 // TODO: confirm whether this second password is meant to be the same value
 // as PASSWORD above ('$WysE123' in the recording looks like a possible typo
 // of '$WsE123' vs. a genuinely different secondary password/PIN).
-const SECOND_PASSWORD = process.env.ETAM_SECOND_PASSWORD ?? '$WysE123';
+const SECOND_PASSWORD = process.env.ETAM480_SECOND_PASSWORD || '$WysE123';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 async function login(page: Page) {
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
+  console.log('Logging in as:', USERNAME);
+
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
 
   await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
   await page.getByRole('textbox', { name: 'Password' }).fill(PASSWORD);
@@ -48,9 +41,36 @@ async function navigateToShiftRounding(page: Page) {
 }
 
 /**
- * Waits for the post-Save result dialog/toast to appear and dismisses it,
- * following the same pattern used in your other specs (e.g. Off Policy
- * Registration, Employee Data Modification).
+ * Picks a random real shift from the Shift dropdown (skips the empty /
+ * "Select" placeholder option) and returns its label.
+ */
+async function selectRandomShift(page: Page): Promise<string> {
+  const shiftSelect = page.locator('select[name="selectedShift"]');
+
+  // Wait until the dropdown has been populated with at least one real option.
+  const getLabels = async () =>
+    shiftSelect.locator('option').evaluateAll((opts) =>
+      opts
+        .map((o) => ({
+          value: (o as HTMLOptionElement).value,
+          label: (o.textContent ?? '').trim(),
+        }))
+        .filter((o) => o.label !== '' && o.value !== '' && !/^(-+\s*)?select/i.test(o.label))
+        .map((o) => o.label)
+    );
+
+  await expect.poll(async () => (await getLabels()).length, { timeout: 10000 }).toBeGreaterThan(0);
+
+  const labels = await getLabels();
+  const randomLabel = labels[Math.floor(Math.random() * labels.length)];
+  console.log(`Random shift selected (${labels.length} available):`, randomLabel);
+
+  await shiftSelect.selectOption({ label: randomLabel });
+  return randomLabel;
+}
+
+/**
+ * Waits for the post-Save result dialog/toast to appear and dismisses it.
  */
 async function closeResultDialogIfPresent(page: Page) {
   const dialog = page.locator('.p-dialog, .p-toast-message').first();
@@ -67,12 +87,16 @@ async function closeResultDialogIfPresent(page: Page) {
 }
 
 test.describe('Shift Rounding', () => {
-  test('rounds a shift for selected weekdays with grace period', async ({ page }) => {
+  // Start from a clean browser context so no saved session (storageState)
+  // from an earlier login is reused.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('rounds a random shift for selected weekdays with grace period', async ({ page }) => {
     await login(page);
     await navigateToShiftRounding(page);
 
-    // Select the shift to configure
-    await page.locator('select[name="selectedShift"]').selectOption('4 - Morning1');
+    // Select a random shift from the dropdown
+    await selectRandomShift(page);
 
     // "Select all" / header checkbox
     await page.locator('.p-checkbox-box').first().click();
@@ -95,9 +119,7 @@ test.describe('Shift Rounding', () => {
     await page.waitForTimeout(PAUSE_MS);
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Finish: wait for and dismiss the save confirmation, then confirm
-    // we're still on a stable, usable state (Save button visible again
-    // means the form re-rendered rather than erroring out).
+    // Dismiss the save confirmation, then confirm the form is usable again.
     await closeResultDialogIfPresent(page);
     await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
   });

@@ -2,7 +2,7 @@ import { test, expect, Page, Download } from '@playwright/test';
 import path from 'path';
 
 const PAUSE_MS = 2500;
-const downloadsDir = 'C:\\Users\\sbg\\Desktop\\SANIKA\\zoho-test-automation-copy\\downloads';
+const downloadsDir = 'C:\\Users\\sbg\\PlaywrightProject_final\\PlaywrightProject\\downloads\\downloads';
 
 // Types confirmed working so far, in order. Add more here once each new
 // type's flow has been confirmed via codegen.
@@ -122,8 +122,8 @@ async function runUploadFlow(page: Page, uploadType: string) {
 test('Upload Report — all confirmed types sequentially', async ({ page }) => {
   test.setTimeout(10 * 60 * 1000);
 
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
   await page.getByRole('textbox', { name: 'Password' }).click();
   await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
   await page.getByRole('button', { name: 'Sign In' }).click();

@@ -2,7 +2,7 @@
 
 // Credentials should come from environment variables (.env + dotenv, or CI secrets)
 // rather than being hardcoded in the spec file.
-const USERNAME = process.env.ETAM_USERNAME ?? 'ADMIN/etam100';
+const USERNAME = process.env.ETAM_USERNAME ?? 'ADMIN/etam480';
 const PASSWORD = process.env.ETAM_PASSWORD ?? '$WysE123';
 
 /**
@@ -118,7 +118,7 @@ test('Contractor Employee LOP - Lock, Draft, and Final', async ({ page }) => {
   const DATE_RANGE = '01/08/2026 - 31/08/2026'; // TODO: confirm intended month/range
 
   await test.step('Login to ETAM Prime', async () => {
-    await page.goto('https://presence.tajhotels.com/etam_prime/login');
+    await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
     await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
     await page.getByRole('textbox', { name: 'Password' }).click();
     await page.getByRole('textbox', { name: 'Password' }).fill(PASSWORD);

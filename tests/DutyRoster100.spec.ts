@@ -6,7 +6,7 @@ test.setTimeout(300000); // 5 minutes
 
 test('Duty Roster Excel Upload', async ({ page }) => {
   const MODULE_NAME = 'Duty Roster';
-  const WEBSITE_URL = 'https://presence.tajhotels.com/etam_prime/login';
+  const WEBSITE_URL = 'https://uatpresence.tajhotels.com/etam_prime/login';
 
   await test.step('Login - Enter credentials and sign in', async () => {
     await page.goto(WEBSITE_URL);
@@ -26,7 +26,7 @@ test('Duty Roster Excel Upload', async ({ page }) => {
     const apiVersion = apiMatch?.[1] ?? '';
     const apiReleaseDate = apiMatch?.[2]?.trim() ?? '';
 
-    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
     await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
     await page.getByRole('button', { name: 'Sign In' }).click();
     await page.waitForLoadState('networkidle');

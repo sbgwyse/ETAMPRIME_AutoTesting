@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test('Download Attendance Report', async ({ page }) => {
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
 
-  await page.getByPlaceholder('Username').fill('ADMIN/etam100');
+  await page.getByPlaceholder('Username').fill('ADMIN/etam480');
   await page.getByPlaceholder('Password').fill('$WysE123');
 
   await page.getByRole('button', { name: 'Sign In' }).click();

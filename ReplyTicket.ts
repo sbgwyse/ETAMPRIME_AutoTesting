@@ -247,15 +247,18 @@ function findProjectRoot(
 
 
 // ============================================================
-// RUN EXISTING PLAYWRIGHT TEST
+// RUN EXISTING PLAYWRIGHT TEST(S)
 // ============================================================
 // Returns both whether the run passed AND the resolved project
 // root, since the caller needs projectRoot to correctly locate
 // the report files this run just generated (they're written
 // relative to projectRoot, not to this script's own cwd).
+// Accepts an array of test file paths (files OR directories) so
+// multiple specs, or an entire folder, can be run together in a
+// single Playwright invocation.
 
 function runPlaywrightTest(
-  testFilePath: string,
+  testFilePaths: string[],
   url: string,
   username: string,
   password: string,
@@ -273,24 +276,26 @@ function runPlaywrightTest(
 
 
   // ----------------------------------------------------------
-  // Find project root
+  // Find project root (based on the first test file)
   // ----------------------------------------------------------
 
   const projectRoot =
-    findProjectRoot(testFilePath);
+    findProjectRoot(testFilePaths[0]);
 
 
   // ----------------------------------------------------------
-  // Relative test path
+  // Relative test paths
   // ----------------------------------------------------------
 
-  const relativeTestPath =
-    path
-      .relative(
-        projectRoot,
-        testFilePath
-      )
-      .replace(/\\/g, '/');
+  const relativeTestPaths =
+    testFilePaths.map(testFilePath =>
+      path
+        .relative(
+          projectRoot,
+          testFilePath
+        )
+        .replace(/\\/g, '/')
+    );
 
 
   console.log('PLAYWRIGHT PROJECT');
@@ -300,9 +305,13 @@ function runPlaywrightTest(
     `Root : ${projectRoot}`
   );
 
-  console.log(
-    `File : ${relativeTestPath}`
-  );
+  relativeTestPaths.forEach(relativeTestPath => {
+
+    console.log(
+      `File : ${relativeTestPath}`
+    );
+
+  });
 
   console.log('------------------------------------------\n');
   const playwrightCommand =
@@ -381,7 +390,7 @@ function runPlaywrightTest(
   }
 
   console.log('\n==========================================');
-  console.log('RUNNING EXISTING PLAYWRIGHT TEST');
+  console.log('RUNNING EXISTING PLAYWRIGHT TEST(S)');
   console.log('==========================================');
 
   console.log(
@@ -401,7 +410,7 @@ function runPlaywrightTest(
   );
 
   console.log(
-    `Test File    : ${relativeTestPath}`
+    `Test Files   : ${relativeTestPaths.join(', ')}`
   );
 
   console.log(
@@ -416,7 +425,7 @@ function runPlaywrightTest(
       [
         playwrightCli,
         'test',
-        relativeTestPath,
+        ...relativeTestPaths,
         '--headed',
       ],
       {
@@ -785,7 +794,7 @@ async function main() {
   console.log('\n==========================================');
 
   console.log(
-    '       EXISTING PLAYWRIGHT TEST'
+    '       EXISTING PLAYWRIGHT TEST(S)'
   );
 
   console.log(
@@ -793,9 +802,15 @@ async function main() {
   );
 
 
+  // ------------------------------------------------------------
+  // Accept one or more test file paths, comma-separated.
+  // A path may also be a FOLDER (e.g. "tests" or "tests/"),
+  // in which case Playwright will run every spec file inside it.
+  // ------------------------------------------------------------
+
   const inputPath =
     await ask(
-      'Enter the full path of the Playwright test file:\n> '
+      'Enter the full path(s) of the Playwright test file(s) or folder(s) (comma-separated):\n> '
     );
 
 
@@ -813,30 +828,24 @@ async function main() {
 
   }
 
-  const testFilePath =
-    path.resolve(
-      inputPath
-        .trim()
-        .replace(
-          /^["']|["']$/g,
-          ''
-        )
-    );
+  const testFilePaths =
+    inputPath
+      .split(',')
+      .map(p =>
+        p
+          .trim()
+          .replace(
+            /^["']|["']$/g,
+            ''
+          )
+      )
+      .filter(p => p.length > 0)
+      .map(p => path.resolve(p));
 
-
-  console.log(
-    `\nTest file: ${testFilePath}`
-  );
-  if (
-    !fs.existsSync(testFilePath)
-  ) {
+  if (testFilePaths.length === 0) {
 
     console.error(
-      '\n❌ Test file not found!'
-    );
-
-    console.error(
-      `Path: ${testFilePath}`
+      '\n❌ No valid test file paths entered.'
     );
 
     rl.close();
@@ -845,36 +854,84 @@ async function main() {
 
   }
 
-  const extension =
-    path
-      .extname(testFilePath)
-      .toLowerCase();
+  for (const testFilePath of testFilePaths) {
 
-
-  if (
-    extension !== '.ts' &&
-    extension !== '.js' &&
-    extension !== '.mts' &&
-    extension !== '.mjs'
-  ) {
-
-    console.error(
-      '\n❌ Invalid test file type.'
+    console.log(
+      `\nTest file: ${testFilePath}`
     );
 
-    console.error(
-      'Please select a Playwright test file such as .spec.ts or .spec.js'
-    );
+    if (
+      !fs.existsSync(testFilePath)
+    ) {
 
-    rl.close();
+      console.error(
+        '\n❌ Test file/folder not found!'
+      );
 
-    process.exit(1);
+      console.error(
+        `Path: ${testFilePath}`
+      );
+
+      rl.close();
+
+      process.exit(1);
+
+    }
+
+    const isDirectory =
+      fs
+        .statSync(testFilePath)
+        .isDirectory();
+
+    if (isDirectory) {
+
+      // Directories are fine — Playwright will discover and run
+      // every matching spec file inside it, so skip the
+      // extension check below for this entry.
+      console.log(
+        '   (folder — Playwright will run every spec inside)'
+      );
+
+      continue;
+
+    }
+
+    const extension =
+      path
+        .extname(testFilePath)
+        .toLowerCase();
+
+
+    if (
+      extension !== '.ts' &&
+      extension !== '.js' &&
+      extension !== '.mts' &&
+      extension !== '.mjs'
+    ) {
+
+      console.error(
+        '\n❌ Invalid test file type.'
+      );
+
+      console.error(
+        `File: ${testFilePath}`
+      );
+
+      console.error(
+        'Please select a Playwright test file such as .spec.ts or .spec.js, or a folder containing tests.'
+      );
+
+      rl.close();
+
+      process.exit(1);
+
+    }
 
   }
 
   const { passed: testPassed, projectRoot } =
     runPlaywrightTest(
-      testFilePath,
+      testFilePaths,
       url,
       username,
       password,
@@ -930,16 +987,32 @@ async function main() {
 
   }
 
-  const testFileModule =
-    path
-      .basename(testFilePath)
-      .replace(/\.spec\.(ts|js|mts|mjs)$/i, '');
+  // Ran at least one folder → treat this as a full-suite run for
+  // the purposes of the summary email (module names don't make
+  // sense for "the whole tests/ folder").
+  const ranAllTests =
+    testFilePaths.some(p =>
+      fs.statSync(p).isDirectory()
+    );
+
+  const testFileModules =
+    testFilePaths
+      .map(testFilePath =>
+        path
+          .basename(testFilePath)
+          .replace(/\.spec\.(ts|js|mts|mjs)$/i, '')
+      )
+      .join(', ');
 
   const who = 'Sanika Gore';
 
   const summary =
     `Dear Team,\n` +
-    `We have checked and observed that the ${testFileModule} Form is  working as expected.\n` +
+    (
+      ranAllTests
+        ? `We have checked and observed that all test cases are working as expected.\n`
+        : `We have checked and observed that the ${testFileModules} Form(s) are working as expected.\n`
+    ) +
     `Please see the Attachments.\n\n` +
     `Regards,\n` +
     `${who}`;

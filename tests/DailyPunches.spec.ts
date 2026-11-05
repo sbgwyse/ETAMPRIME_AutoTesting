@@ -3,7 +3,7 @@ import path from 'path';
 
 // Credentials should come from environment variables (.env + dotenv, or CI
 // secrets) rather than being hardcoded in the spec file.
-const USERNAME = process.env.ETAM_USERNAME ?? 'ADMIN/etam100';
+const USERNAME = process.env.ETAM_USERNAME ?? 'ADMIN/etam480';
 const PASSWORD = process.env.ETAM_PASSWORD ?? '$WysE123';
 
 async function waitForOverlayGone(page: Page, timeout = 15000) {
@@ -15,11 +15,10 @@ async function waitForOverlayGone(page: Page, timeout = 15000) {
 }
 
 async function login(page: Page) {
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
-  await page.getByRole('textbox', { name: 'Password' }).click();
-  await page.getByRole('textbox', { name: 'Password' }).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
+    await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
+    await page.getByRole('button', { name: 'Sign In' }).click();
   await waitForOverlayGone(page);
 }
 

@@ -3,7 +3,7 @@ import { test, expect, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RegistrationFormsPage } from '../pages/RegistrationFormsPage';
 
-const VALID_USERNAME = 'ADMIN/etam100';
+const VALID_USERNAME = 'ADMIN/etam480';
 const VALID_PASSWORD = '$WysE123';
 
 const EMPLOYEE_ID = '100100111';

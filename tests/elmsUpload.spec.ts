@@ -7,8 +7,8 @@ import fs from 'fs';
  * Downloads the "Download Format With Data" file for each leave type (CL, PL).
  */
 
-const BASE_URL = 'https://presence.tajhotels.com/etam_prime/login';
-const USERNAME = 'ADMIN/etam100';
+const BASE_URL = 'https://uatpresence.tajhotels.com/etam_prime/login';
+const USERNAME = 'ADMIN/etam480';
 const PASSWORD = '$WysE123';
 
 const DOWNLOAD_DIR = path.resolve(__dirname, '../downloads');

@@ -1,6 +1,46 @@
 import { test, expect, Page } from '@playwright/test';
 
-test('Monthly Employee Wise Present Days - edit existing entry (Shiv Kumar / July)', async ({ page }) => {
+// Picks a random employee on the Monthly Employee Wise Present Days screen.
+// The raw recording just .fill()'d the full "<ID> - <Name>" string directly
+// into the field with no suggestion click — which only works if you already
+// know a valid, exact "ID - Name" pair. To pick randomly, this instead types
+// a broad partial digit to surface the autocomplete's suggestions and clicks
+// one, the same type-to-filter pattern used in the Transaction Edit spec.
+// TODO: unconfirmed whether this field's suggestion panel renders "<ID> -
+// <Name>" (like the Assign Menu chevron lists) or just "- <Name>" (like
+// Transaction Edit) — the selector below matches either shape.
+async function selectRandomEmployee(page: Page): Promise<string> {
+  const employeeField = page.locator('input[name="emp"]');
+  await employeeField.click();
+  await employeeField.fill('1');
+
+  const suggestions = page
+    .locator('.p-autocomplete-panel li, .mat-autocomplete-panel mat-option, li, div')
+    .filter({ hasText: /(^-\s*\S)|(^\d+\s*-\s*.+)/ });
+
+  const found = await suggestions
+    .first()
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!found) {
+    // Fallback: '1' surfaced no suggestions on this run — keep the
+    // originally confirmed employee rather than submitting a blank/invalid
+    // value.
+    await employeeField.fill('100000001 - Shiv Kumar');
+    return '100000001 - Shiv Kumar (fallback — "1" surfaced no suggestions)';
+  }
+
+  const count = await suggestions.count();
+  const randomIndex = Math.floor(Math.random() * count);
+  const chosen = suggestions.nth(randomIndex);
+  const chosenText = ((await chosen.textContent()) ?? '').trim();
+  await chosen.click();
+  return chosenText;
+}
+
+test('Monthly Employee Wise Present Days - edit existing entry (random employee / July)', async ({ page }) => {
   const waitForLoaderHidden = async () => {
     const loader = page.locator('.ngx-overlay, ngx-ui-loader');
     await loader.first().waitFor({ state: 'hidden' }).catch(() => {});
@@ -22,8 +62,8 @@ test('Monthly Employee Wise Present Days - edit existing entry (Shiv Kumar / Jul
     }
   };
 
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
   await page.getByRole('textbox', { name: 'Password' }).click();
   await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -31,8 +71,8 @@ test('Monthly Employee Wise Present Days - edit existing entry (Shiv Kumar / Jul
   await page.getByText('ADMINISTRATION').click();
   await page.getByRole('combobox').selectOption('Monthly Employee Wise Present Days');
 
-  await page.locator('input[name="emp"]').click();
-  await page.locator('input[name="emp"]').fill('100000001 - Shiv Kumar');
+  const employee = await selectRandomEmployee(page);
+  console.log(`Selected employee: ${employee}`);
 
   await page.getByRole('spinbutton', { name: 'Present Days *' }).click();
   await page.locator('select[name="month"]').selectOption('July');
@@ -42,6 +82,4 @@ test('Monthly Employee Wise Present Days - edit existing entry (Shiv Kumar / Jul
   await waitForLoaderHidden();
   await clickSaveOrModify();
   await checkForDuplicateEntryError();
-
- 
 });

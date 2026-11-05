@@ -2,8 +2,10 @@ import { test, expect, Page } from '@playwright/test';
 
 test.setTimeout(120000);
 
-const USERNAME = process.env.ETAM_USERNAME || 'ADMIN/etam100';
+const USERNAME = process.env.ETAM_USERNAME || 'ADMIN/etam480';
 const PASSWORD = process.env.ETAM_PASSWORD || '$WysE123';
+
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 async function waitForOverlayGone(page: Page, timeout = 15000) {
   await page
@@ -39,12 +41,52 @@ async function closeOpenMultiselect(page: Page) {
   await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 }
 
+/**
+ * Picks a random employee from the open multiselect panel.
+ * Checkbox 0 in the panel is the "select all" checkbox in the header, so it is
+ * skipped (same as the old fixed `nth(1)`); the random pick is from 1..count-1.
+ */
+async function selectRandomEmployee(page: Page): Promise<number> {
+  const checkboxes = page.locator('.p-multiselect-panel').getByRole('checkbox');
+
+  // wait until at least one employee (index 1) is in the list
+  await checkboxes.nth(1).waitFor({ state: 'attached', timeout: 15000 });
+
+  const count = await checkboxes.count();
+  const index = randomInt(1, count - 1);
+  await checkboxes.nth(index).click();
+  return index;
+}
+
+/**
+ * Picks a random Reporting Officer from the RO dropdown.
+ * Skips the placeholder / disabled options (empty value).
+ */
+async function selectRandomRO(page: Page): Promise<string> {
+  const roSelect = page.locator('select[name="ro"]');
+
+  // wait until the RO list has real options (not just the placeholder)
+  const getValues = async () =>
+    roSelect.locator('option').evaluateAll((opts) =>
+      (opts as HTMLOptionElement[])
+        .filter((o) => o.value && o.value.trim() !== '' && !o.disabled)
+        .map((o) => o.value)
+    );
+
+  await expect.poll(async () => (await getValues()).length, { timeout: 15000 }).toBeGreaterThan(0);
+
+  const values = await getValues();
+  const value = values[randomInt(0, values.length - 1)];
+  await roSelect.selectOption(value);
+  return value;
+}
+
 test('Edit Reporting Structure', async ({ page }) => {
 
   // ==========================
   // LOGIN
   // ==========================
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
 
   await page.getByRole('textbox', { name: 'Username' }).fill(USERNAME);
   await page.getByRole('textbox', { name: 'Password' }).click();
@@ -68,31 +110,25 @@ test('Edit Reporting Structure', async ({ page }) => {
   console.log('Edit Reporting Structure Opened');
 
   // ==========================
-  // SELECT EMPLOYEE
+  // SELECT EMPLOYEE (RANDOM)
   // ==========================
-  // NOTE: fragile index-based checkbox selection carried over from the
-  // raw recording — no visible employee name/ID was captured, so this
-  // just picks whichever employee lands at checkbox index 1. Replace
-  // with a label/ID-based locator once you know which employee this
-  // should actually be (same issue flagged in other multiselect steps
-  // across this project).
   await page.getByText('--Select Employee--').click();
-  await page.getByRole('checkbox').nth(1).click();
+  const employeeIndex = await selectRandomEmployee(page);
   await waitForOverlayGone(page);
 
   // Close the panel before moving on — this is the step that was missing
   // and caused the Submit click to hang (see closeOpenMultiselect above).
   await closeOpenMultiselect(page);
 
-  console.log('Employee Selected (checkbox index 1)');
+  console.log(`Employee Selected (random checkbox index ${employeeIndex})`);
 
   // ==========================
-  // SELECT REPORTING OFFICER (RO)
+  // SELECT REPORTING OFFICER (RO) (RANDOM)
   // ==========================
-  await page.locator('select[name="ro"]').selectOption('100000001');
+  const roValue = await selectRandomRO(page);
   await waitForOverlayGone(page);
 
-  console.log('RO Selected: 100000001');
+  console.log(`RO Selected (random): ${roValue}`);
 
   // ==========================
   // SUBMIT
@@ -115,8 +151,6 @@ test('Edit Reporting Structure', async ({ page }) => {
   } catch {
     console.log('No confirmation dialog appeared — continuing.');
   }
-
-  await page.screenshot({ path: 'edit_reporting_structure_result.png', fullPage: true });
 
   console.log('Process Completed');
 });

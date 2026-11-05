@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = 'https://presence.tajhotels.com/etam_prime/login';
-const USERNAME = 'ADMIN/etam100';
+const BASE_URL = 'https://uatpresence.tajhotels.com/etam_prime/login';
+const USERNAME = 'ADMIN/etam480';
 const PASSWORD = '$WysE123';
 
 const PAUSE_MS = 500;
@@ -38,29 +38,29 @@ async function navigateToCreditAdvanceBalance(page: Page) {
 
 /**
  * Selects a leave type by its visible label text rather than a guessed
- * `value` attribute. The original recording captured "undefined" for this
- * select (a codegen artifact — the real value attribute wasn't captured),
- * and a follow-up guess of '1' turned out not to match any real option
- * either: selectOption() with a non-matching value doesn't fail fast, it
- * just retries "did not find some options" until the test timeout (confirmed
- * via a 180s hang). This fails fast with the real option list instead of
- * silently hanging if the label doesn't match.
+ * `value` attribute. The match ignores case and surrounding whitespace, because
+ * the app renders the labels in capitals ("CASUAL LEAVE").
+ *
+ * selectOption() with a non-matching value doesn't fail fast, it just retries
+ * "did not find some options" until the test timeout, so this checks the real
+ * option list first and fails immediately with it if the label doesn't match.
  */
 async function selectLeaveTypeByLabel(page: Page, labelText: string) {
   const select = page.locator('select[name="selectedLeave"]');
   await select.waitFor({ state: 'visible', timeout: 15000 });
 
-  const optionTexts = await select.locator('option').allTextContents();
-  const trimmed = optionTexts.map((t) => t.trim());
+  const optionTexts = (await select.locator('option').allTextContents()).map((t) => t.trim());
+  const wanted = labelText.trim().toLowerCase();
+  const actualLabel = optionTexts.find((t) => t.toLowerCase() === wanted);
 
-  if (!trimmed.includes(labelText)) {
+  if (!actualLabel) {
     throw new Error(
       `Leave type "${labelText}" not found in select[name="selectedLeave"]. ` +
-      `Available options: ${JSON.stringify(trimmed)}`
+      `Available options: ${JSON.stringify(optionTexts)}`
     );
   }
 
-  await select.selectOption({ label: labelText });
+  await select.selectOption({ label: actualLabel });
 }
 
 // --- Flow -------------------------------------------------------------
@@ -82,8 +82,6 @@ async function creditAdvanceBalance(
   await page.getByRole('button', { name: 'Save' }).click();
   await closeResultDialogIfPresent(page);
 
-  // Select by visible label instead of a guessed value attribute — see
-  // selectLeaveTypeByLabel for why.
   await selectLeaveTypeByLabel(page, leaveTypeLabel);
 
   // Recording clicked into Advance Balance again but never re-filled it
@@ -104,7 +102,7 @@ test('Credit Advance Balance', async ({ page }) => {
     page,
     '67',
     '2',
-    'Casual Leave' // TODO: confirm the real label — placeholder, guessed like '1' was
+    'CASUAL LEAVE' // options available: CASUAL LEAVE, PRIVILEGE LEAVE, EARNED LEAVE, TOUR, TRANSFER LEAVE, BEREAVEMENT LEAVE, SUSPENSION LEAVE, THANK YOU LEAVE, MAT SICK LEAVE
   );
 
   // TODO: replace with an actual success assertion once the confirmation

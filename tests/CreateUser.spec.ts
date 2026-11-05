@@ -1,8 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 
 async function login(page: Page) {
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
   await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
   await page.getByRole('button', { name: 'Sign In' }).click();
 }
@@ -63,5 +63,5 @@ test('eLMS Configuration - Create User', async ({ page }) => {
 
   // Full ID required — a bare name-only string (e.g. '-Dhruv Pokale')
   // can never uniquely resolve when duplicate names exist in the table.
-  await createUser(page, '500100126', 'Dhruv Pokale');
+  await createUser(page, '880140991', 'Neelam K');
 });

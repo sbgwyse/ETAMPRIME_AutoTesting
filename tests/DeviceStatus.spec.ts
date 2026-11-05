@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test('Device Status', async ({ page }) => {
   // Login (single-step, current password)
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
-  await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
+    await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
+    await page.getByRole('button', { name: 'Sign In' }).click();
   await page.waitForURL('**/client**');
 
   // Navigate to Device Status

@@ -1,8 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 
 async function login(page: Page) {
-  await page.goto('https://presence.tajhotels.com/etam_prime/login');
-  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+  await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+  await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
   await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
   await page.getByRole('button', { name: 'Sign In' }).click();
 }

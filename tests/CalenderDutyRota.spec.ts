@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test('Duty Roster - Shift, Weekly Off, Off Policy assignment', async ({ page }) => {
   await test.step('Login to ETAM Prime', async () => {
-    await page.goto('https://presence.tajhotels.com/etam_prime/login');
-    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam100');
+    await page.goto('https://uatpresence.tajhotels.com/etam_prime/login');
+    await page.getByRole('textbox', { name: 'Username' }).fill('ADMIN/etam480');
     await page.getByRole('textbox', { name: 'Password' }).fill('$WysE123');
     await page.getByRole('button', { name: 'Sign In' }).click();
     await page.getByText('REGISTRATION').click();

@@ -5,7 +5,7 @@ import { EmployeeDataModificationPage } from '../pages/EmployeeDataModificationP
 // const VALID_USERNAME = process.env.ETAM_USERNAME as string;
 // const VALID_PASSWORD = process.env.ETAM_PASSWORD as string;
  
-const VALID_USERNAME = 'ADMIN/etam100';
+const VALID_USERNAME = 'ADMIN/etam480';
 const VALID_PASSWORD = '$WysE123';
 const TEST_EMPLOYEE_SEARCH = '100';
 const TEST_EMPLOYEE_RESULT = 'Shiv Kumar';

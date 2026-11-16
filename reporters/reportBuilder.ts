@@ -33,6 +33,8 @@ export interface ReportMeta {
 
 export interface TestRecord {
   title: string;
+  file?: string;
+  error?: string;
   status: string;
   durationMs: number;
   steps: StepRecord[];

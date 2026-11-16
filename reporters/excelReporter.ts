@@ -79,7 +79,8 @@ export async function writeExcelReport(results: StepResult[], meta: ReportMeta) 
         pattern: 'solid',
         fgColor: { argb: NAVY },
       };
-      sectionRow.height = 20;
+      sectionRow.getCell(1).alignment = { wrapText: true };
+      sectionRow.height = Math.max(20, Math.ceil(currentSection.length / 95) * 16);
     }
 
     const row = sheet.addRow([r.field, r.status, r.duration, r.error || '']);

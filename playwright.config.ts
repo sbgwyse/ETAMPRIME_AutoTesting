@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   // Only pick up real specs, not compiled copies in dist/ or other folders
-  testDir: './tests',
+  testDir: '.',
   timeout: 180000,
   retries: 0,
 

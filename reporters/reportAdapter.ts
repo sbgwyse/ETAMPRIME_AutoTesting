@@ -31,23 +31,20 @@ export function toStyledReport(records: TestRecord[]): { meta: ReportMeta; resul
   const first = records[0];
   const firstMeta = first?.reportMeta;
 
-  // appVersion/apiVersion aren't collected anywhere in the live pipeline yet,
-  // so they're left blank — excelReporter/pdfReporter both skip those lines
-  // when the value is falsy.
   const meta: ReportMeta = {
-    formTitle: firstMeta?.formTitle || first?.title || 'Automation Test Report',
-    module: firstMeta?.formTitle || first?.title || '',
+    formTitle: process.env.REPORT_TITLE || (records.length > 1 ? 'Combined Automation Test Report' : firstMeta?.formTitle || first?.title || 'Automation Test Report'),
+    module: records.length > 1 ? 'Multiple tests' : firstMeta?.formTitle || first?.title || '',
     website: firstMeta?.websiteUrl || '',
-    appVersion: '',
-    appReleaseDate: '',
-    apiVersion: '',
-    apiReleaseDate: '',
+    appVersion: process.env.REPORT_APP_VERSION || 'NA',
+    appReleaseDate: process.env.REPORT_APP_RELEASE_DATE || 'NA',
+    apiVersion: process.env.REPORT_API_VERSION || 'NA',
+    apiReleaseDate: process.env.REPORT_API_RELEASE_DATE || 'NA',
   };
 
   const results: StepResult[] = [];
 
   records.forEach((record) => {
-    const section = record.reportMeta?.formTitle || record.title;
+    const section = [record.file, record.reportMeta?.formTitle || record.title].filter(Boolean).join(' — ');
 
     if (record.steps.length === 0) {
       results.push({
@@ -55,7 +52,7 @@ export function toStyledReport(records: TestRecord[]): { meta: ReportMeta; resul
         field: record.title,
         status: capitalizeStatus(record.status),
         duration: (record.durationMs / 1000).toFixed(2),
-        error: undefined,
+        error: record.error,
       });
       return;
     }

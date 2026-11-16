@@ -13,6 +13,11 @@ const VALID_USERNAME = process.env.ETAM_USERNAME as string;
 const VALID_PASSWORD = process.env.ETAM_PASSWORD as string;
 
 test.describe('Dashboard', () => {
+  // The ticket runner saves its authenticated session for opt-in suites.
+  // Normal Playwright runs continue to use the login below.
+  if (process.env.TEST_AUTH_STATE) {
+    test.use({ storageState: process.env.TEST_AUTH_STATE });
+  }
   let login: LoginPage;
   let dashboard: DashboardPage;
 
@@ -20,8 +25,12 @@ test.describe('Dashboard', () => {
     login = new LoginPage(page);
     dashboard = new DashboardPage(page);
 
-    await login.goto();
-    await login.login(VALID_USERNAME, VALID_PASSWORD);
+    if (process.env.TEST_AUTH_STATE) {
+      await page.goto(process.env.TEST_URL!);
+    } else {
+      await login.goto();
+      await login.login(VALID_USERNAME, VALID_PASSWORD);
+    }
     await login.expectLoggedIn();
   });
 

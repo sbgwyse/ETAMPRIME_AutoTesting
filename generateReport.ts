@@ -29,12 +29,17 @@ async function main() {
 
   const records: TestRecord[] = JSON.parse(fs.readFileSync(recordsPath, 'utf-8'));
 
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new Error('The last run contains no test results. Run Playwright tests before generating a report.');
+  }
+
   const { meta, results } = toStyledReport(records);
 
   await writeExcelReport(results, meta);
   await writePdfReport(results, meta);
 
   console.log('Report generated:', STYLED_PDF_PATH, STYLED_EXCEL_PATH);
+  console.log(`Included ${records.length} test result(s) from the last Playwright run.`);
 }
 
 main().catch((err) => {

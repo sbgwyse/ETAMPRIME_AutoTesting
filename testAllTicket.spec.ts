@@ -4,6 +4,7 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import * as os from 'os';
 import { spawnSync } from 'child_process';
 import { chromium } from '@playwright/test';
 
@@ -109,7 +110,8 @@ const LOGIN_ERROR_SNIPPETS = [
 async function checkCredentials(
   url: string,
   username: string,
-  password: string
+  password: string,
+  authStatePath: string
 ): Promise<boolean> {
   const browser = await chromium.launch();
 
@@ -135,9 +137,14 @@ async function checkCredentials(
 
     const lower = bodyText.toLowerCase();
 
-    return !LOGIN_ERROR_SNIPPETS.some(
+    const valid = !LOGIN_ERROR_SNIPPETS.some(
       snippet => lower.includes(snippet)
-    );
+    ) && !(await page.getByRole('button', { name: 'Sign In' }).isVisible());
+
+    if (valid) {
+      await page.context().storageState({ path: authStatePath });
+    }
+    return valid;
   } finally {
     await browser.close();
   }
@@ -193,7 +200,8 @@ function runPlaywrightTest(
   reportTitle: string,
   subject: string,
   description: string,
-  requesterEmail: string
+  requesterEmail: string,
+  authStatePath: string
 ): { passed: boolean; projectRoot: string } {
 
   const projectRoot = findProjectRoot(testTargetPath);
@@ -310,6 +318,9 @@ for (const report of oldReports) {
         TEST_URL: url,
         TEST_USERNAME: username,
         TEST_PASSWORD: password,
+        ETAM_USERNAME: username,
+        ETAM_PASSWORD: password,
+        TEST_AUTH_STATE: authStatePath,
 
         REPORT_TITLE: reportTitle,
         SOURCE_TYPE: sourceType,
@@ -358,7 +369,7 @@ for (const report of oldReports) {
 // MAIN
 // ============================================================
 
-async function main(): Promise<void> {
+async function main(authStatePath: string): Promise<void> {
   console.log('\n=================================');
   console.log('ZOHO DESK TEST AUTOMATION');
   console.log('=================================\n');
@@ -480,7 +491,8 @@ async function main(): Promise<void> {
     credentialsValid = await checkCredentials(
       url,
       username,
-      password
+      password,
+      authStatePath
     );
 
     console.log(
@@ -531,7 +543,8 @@ async function main(): Promise<void> {
     reportTitle,
     subject,
     description,
-    requesterEmail
+    requesterEmail,
+    authStatePath
   );
 
   // ----------------------------------------------------------
@@ -646,8 +659,11 @@ const summary =
 // ERROR HANDLING
 // ============================================================
 
-main().catch(error => {
+const authDir = fs.mkdtempSync(path.join(os.tmpdir(), 'etam-auth-'));
+main(path.join(authDir, 'state.json')).catch(error => {
   console.error('\nAutomation failed:', error);
   rl.close();
   process.exitCode = 1;
+}).finally(() => {
+  fs.rmSync(authDir, { recursive: true, force: true });
 });

@@ -1,23 +1,3 @@
-// custom-report.ts
-//
-// Playwright reporter — runs automatically after every `npx playwright test`
-// (it's wired up in playwright.config.ts). Its behavior is controlled by two
-// environment variables, so this ONE file supports all three workflows
-// without ever needing to be edited by hand:
-//
-//   GENERATE_REPORT=true   -> build the PDF/Excel report at the end of the run
-//   GENERATE_REPORT=false  -> skip building the report; only save the raw
-//                             run data (test-results/last-run-records.json)
-//                             so "npm run generate-report" can build it later
-//   CREATE_TICKET=true     -> after the report is built, file a Zoho ticket
-//                             (only takes effect when GENERATE_REPORT=true)
-//
-// Don't set these by hand — use the npm scripts in package.json:
-//   npm run test:report      -> Case 1: run tests + report, no ticket
-//   npm run test:only        -> Case 2: run tests only, report NOT built yet
-//   npm run generate-report  -> Case 2 (part 2): build the report whenever
-//                                you want, from the last "test:only" run
-//   npm run test:full        -> Case 3: run tests + report + ticket, in one go
  
 import type {
   Reporter,
@@ -77,6 +57,8 @@ export default class CustomReport implements Reporter {
  
     this.records.push({
       title: test.title,
+      file: path.relative(process.cwd(), test.location.file).replace(/\\/g, '/'),
+      error: result.error?.message,
       status: result.status,
       durationMs: result.duration,
       steps,
@@ -86,7 +68,9 @@ export default class CustomReport implements Reporter {
   }
  
   async onEnd(result: FullResult) {
-    if (this.records.length === 0) return;
+    if (this.records.length === 0) {
+      console.warn('No test results were collected; no combined report can be generated.');
+    }
  
     const outDir = 'test-results';
     if (!fs.existsSync(outDir)) {
@@ -99,6 +83,8 @@ export default class CustomReport implements Reporter {
       path.join(outDir, 'last-run-records.json'),
       JSON.stringify(this.records, null, 2),
     );
+
+    if (this.records.length === 0) return;
  
     const shouldGenerateReport = process.env.GENERATE_REPORT === 'true';
  
@@ -111,10 +97,8 @@ export default class CustomReport implements Reporter {
     }
  
     const { meta, results } = toStyledReport(this.records);
-    const appVersion = process.env.REPORT_APP_VERSION || 'NA';
-    const apiversion = process.env.REPORT_API_VERSION || 'NA';
     await writeExcelReport(results, meta);
-    await writePdfReport(results, meta,appVersion,apiversion);
+    await writePdfReport(results, meta);
  
     console.log('Report generated:', STYLED_PDF_PATH, STYLED_EXCEL_PATH);
  

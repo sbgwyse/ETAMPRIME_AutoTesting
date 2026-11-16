@@ -20,7 +20,8 @@ export async function writePdfReport(results: StepResult[], meta: ReportMeta) {
 
   const file = path.join(folder, 'Automation_Report.pdf');
   const doc = new PDFDocument({ margin: PAGE_MARGIN, size: 'A4' });
-  doc.pipe(fs.createWriteStream(file));
+  const stream = fs.createWriteStream(file);
+  doc.pipe(stream);
 
   const pageWidth = doc.page.width - PAGE_MARGIN * 2;
 
@@ -84,12 +85,14 @@ export async function writePdfReport(results: StepResult[], meta: ReportMeta) {
   results.forEach((r) => {
     if (r.section !== currentSection) {
       currentSection = r.section;
-      ensureSpace(SECTION_ROW_HEIGHT);
+      doc.font('Helvetica-Bold').fontSize(11);
+      const sectionHeight = Math.max(SECTION_ROW_HEIGHT, doc.heightOfString(currentSection, { width: pageWidth - 20 }) + 10);
+      ensureSpace(sectionHeight);
       const y = doc.y;
-      doc.rect(PAGE_MARGIN, y, pageWidth, SECTION_ROW_HEIGHT).fill(NAVY);
+      doc.rect(PAGE_MARGIN, y, pageWidth, sectionHeight).fill(NAVY);
       doc.fillColor('white').font('Helvetica-Bold').fontSize(11);
-      doc.text(currentSection, COL_X.field, y + 5);
-      doc.y = y + SECTION_ROW_HEIGHT + 4;
+      doc.text(currentSection, COL_X.field, y + 5, { width: pageWidth - 20 });
+      doc.y = y + sectionHeight + 4;
     }
 
     ensureSpace(ROW_HEIGHT);
@@ -108,4 +111,9 @@ export async function writePdfReport(results: StepResult[], meta: ReportMeta) {
   });
 
   doc.end();
+  await new Promise<void>((resolve, reject) => {
+    stream.on('finish', resolve);
+    stream.on('error', reject);
+    doc.on('error', reject);
+  });
 }
